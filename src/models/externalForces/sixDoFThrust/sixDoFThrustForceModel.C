@@ -1,0 +1,105 @@
+/*---------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     |
+    \\  /    A nd           | www.openfoam.com
+     \\/     M anipulation  |
+-------------------------------------------------------------------------------
+    Copyright (C) 2026 Chinmay S. Patil
+-------------------------------------------------------------------------------
+License
+    This file is part of freeBodyFoam.
+    SPDX-License-Identifier: GPL-3.0-or-later
+
+    freeBodyFoam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    freeBodyFoam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+    or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+    for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with freeBodyFoam.  If not, see <http://www.gnu.org/licenses/>.
+
+Class
+    Foam::externalForceModels::sixDoFThrustForce
+
+Implementation
+    Foam::externalForceModels::sixDoFThrustForce
+\*---------------------------------------------------------------------------*/
+
+#include "sixDoFThrustForceModel.H"
+#include "addToRunTimeSelectionTable.H"
+
+namespace Foam
+{
+namespace externalForceModels
+{
+    defineTypeNameAndDebug(sixDoFThrustForce, 0);
+    addToRunTimeSelectionTable(externalForceModel, sixDoFThrustForce, dictionary);
+    addNamedToRunTimeSelectionTable(externalForceModel, sixDoFThrustForce, dictionary, sixDoFThrust);
+}
+}
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
+
+Foam::externalForceModels::sixDoFThrustForce::sixDoFThrustForce
+(
+    const word& name,
+    const dictionary& dict
+)
+:
+    externalForceModel(name, dict),
+    direction_(dict.get<vector>("direction")),
+    magnitude_(dict.get<scalar>("magnitude")),
+    startTime_(dict.getOrDefault<scalar>("startTime", 0.0)),
+    endTime_(dict.getOrDefault<scalar>("endTime", GREAT)),
+    applicationPoint_(dict.getOrDefault<point>("applicationPoint", point::zero))
+{
+    const scalar magD = mag(direction_);
+    if (magD < SMALL)
+    {
+        FatalErrorInFunction
+            << "Zero length direction vector provided for 6DoFThrust '" << name << "'."
+            << exit(FatalError);
+    }
+    direction_ /= magD;
+
+    if (endTime_ < startTime_)
+    {
+        FatalErrorInFunction
+            << "endTime (" << endTime_ << " s) is less than startTime ("
+            << startTime_ << " s) for 6DoFThrust '" << name << "'."
+            << exit(FatalError);
+    }
+}
+
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+Foam::bodyLoad Foam::externalForceModels::sixDoFThrustForce::evaluate
+(
+    const scalar t,
+    const quaternion& q
+) const
+{
+    if (!active_ || t < startTime_ || t > endTime_)
+    {
+        return bodyLoad();
+    }
+
+    // Force in body coordinates
+    const vector F_body = magnitude_ * direction_;
+
+    // Transform force and application point from body to global coordinates
+    const vector F_global = q.transform(F_body);
+    const vector r_global = q.transform(applicationPoint_);
+
+    const vector moment_global = r_global ^ F_global;
+    return bodyLoad(F_global, moment_global);
+}
+
+// ************************************************************************* //

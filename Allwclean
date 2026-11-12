@@ -1,0 +1,14 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Chinmay S. Patil
+cd "${0%/*}" || exit 1   # run from this directory
+
+. "${WM_PROJECT_DIR:?}/bin/tools/RunFunctions"
+
+echo "Cleaning freeBodyFoam core src..."
+
+if [ -f "$PWD/src/Allwclean" ]; then
+    "$PWD/src/Allwclean"
+fi
+
+echo "Done."

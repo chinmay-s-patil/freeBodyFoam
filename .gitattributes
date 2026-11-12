@@ -1,0 +1,22 @@
+* text=auto eol=lf
+
+*.sh text eol=lf
+Allrun text eol=lf
+Allclean text eol=lf
+Allwmake text eol=lf
+Allwclean text eol=lf
+
+*.C text eol=lf
+*.H text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+
+*.png binary
+*.gif binary
+*.jpg binary
+*.pdf binary
+*.mp4 binary
+*.zip binary

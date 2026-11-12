@@ -1,0 +1,22 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Chinmay S. Patil
+cd "${0%/*}" || exit                                # Run from this directory
+. ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions        # Tutorial run functions
+#------------------------------------------------------------------------------
+# theRodDrop-Denser — freeBodyPimpleFoam tutorial
+#
+# Dense fluid (rhoInf = 300 kg/m^3), 2-D planar half-symmetry cylinder,
+# body-fixed falling frame. No dynamic mesh; fluid accelerates upward.
+#------------------------------------------------------------------------------
+
+# 1. Build the mesh
+runApplication blockMesh
+
+# 2. Copy initial conditions from the pristine directory
+restore0Dir
+
+# 3. Run the solver
+runApplication $(getApplication)
+
+#------------------------------------------------------------------------------

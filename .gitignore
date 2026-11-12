@@ -1,0 +1,181 @@
+# ==============================================================================
+# Validation Cases & Telemetry Data
+# Keep verification scripts, analysis tools, plots, case dicts, and motion telemetry.
+# Full 3D time step volume fields and processor decomposition dumps
+# are excluded here.
+# ==============================================================================
+validation/baseline_drag/*
+!validation/baseline_drag/*.py
+!validation/baseline_drag/*.sh
+validation/mesh_convergence/*
+!validation/mesh_convergence/*.py
+!validation/mesh_convergence/*.sh
+
+# Exclude heavy intermediate meshing directories and generated cell-region maps
+validation/thinDisk2mm/meshing/
+validation/thinDisk2mm_tumbling/meshing/
+cellToRegion
+validation/thinDisk2mm/case/render/slowdown40.mp4
+validation/temporal_convergence/**/polyMesh/
+validation/temporal_convergence/**/[0-9]*/
+
+# Ensure motion telemetry required for ASME V&V 20 and verification reproducibility is tracked
+!validation/**/postProcessing/**/motion.dat
+
+
+# ==============================================================================
+# OpenFOAM Build & Compilation Artifacts
+# ==============================================================================
+**/Make/linux*
+lnInclude/
+platforms/
+linux64GccDPInt32Opt/
+*.o
+*.so
+*.dep
+
+
+# ==============================================================================
+# OpenFOAM Time Steps and Simulation Data
+# ==============================================================================
+[1-9]*/
+0.*/
+-[0-9]*/
+tutorials/**/0/
+!0.orig/
+
+
+# ==============================================================================
+# OpenFOAM Parallel Decomposition & Post-Processing
+# ==============================================================================
+processor*
+postProcessing*/
+!validation/thinDisk2mm*/case/postProcessing/
+!validation/thinDisk2mm*/case/postProcessing/**/
+!validation/thinDisk2mm*/case/postProcessing/**/motion.dat
+!validation/temporal_convergence/**/postProcessing/
+!validation/temporal_convergence/**/postProcessing/**/
+!validation/temporal_convergence/**/postProcessing/**/motion.dat
+!validation/uhlmann_sphere/**/postProcessing/
+!validation/uhlmann_sphere/**/postProcessing/**/
+validation/uhlmann_sphere/**/postProcessing/**/force*.dat
+validation/uhlmann_sphere/**/postProcessing/**/moment*.dat
+!validation/uhlmann_sphere/**/postProcessing/**/motion.dat
+!validation/fernandes2007/**/postProcessing/
+!validation/fernandes2007/**/postProcessing/**/
+!validation/fernandes2007/**/postProcessing/**/motion.dat
+dynamicCode/
+
+
+# ==============================================================================
+# Logs and Simulation Temporary Files
+# ==============================================================================
+log*
+*.log
+*.foam
+
+
+# ==============================================================================
+# Generated Mesh Data
+# Keep mesh dictionaries, boundary files, and STL files
+# ==============================================================================
+**/polyMesh/points
+**/polyMesh/faces
+**/polyMesh/owner
+**/polyMesh/neighbour
+**/polyMesh/cells
+**/polyMesh/pointZones
+**/polyMesh/faceZones
+**/polyMesh/cellZones
+**/polyMesh/sets/
+**/polyMesh/cellLevel
+**/polyMesh/level0Edge
+**/polyMesh/pointLevel
+**/polyMesh/surfaceIndex
+
+extendedFeatureEdgeMesh/
+*.extendedFeatureEdgeMesh
+*.eMesh
+
+# Duplicate intermediate meshing STLs (canonical copies preserved in case triSurface/)
+**/meshing/staticMesh/constant/triSurface/*.stl
+**/meshing/rotatingMesh/constant/triSurface/*.stl
+validation/uhlmann_sphere/gate_fixed_AMI/meshing/triSurface/
+
+*.obj
+*.vtk
+*.vtp
+
+VTK/
+sets/
+surfaces/
+uniform/
+
+
+# ==============================================================================
+# CAD and 3D Modelling Files
+# ==============================================================================
+*.FCStd
+*.FCBak
+
+FreeCAD/
+
+*.step
+*.STEP
+*.stp
+*.STP
+
+*.sldprt
+*.SLDPRT
+*.sldasm
+*.SLDASM
+
+
+# ==============================================================================
+# Mesh Backups and Temporary Folders
+# ==============================================================================
+orig/
+orig_*/
+backup*/
+*BackUp/
+
+*.bak
+*.bak_*
+
+
+# ==============================================================================
+# LaTeX Build Artifacts
+# ==============================================================================
+*.aux
+*.out
+*.toc
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+
+
+# ==============================================================================
+# Python Caches
+# ==============================================================================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+
+# ==============================================================================
+# General Editor & OS Files
+# ==============================================================================
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+
+# ==============================================================================
+# Local Zenodo Archival Tarballs
+# ==============================================================================
+validation/zenodo_archives/
+*.tar.gz

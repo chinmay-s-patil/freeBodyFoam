@@ -1,0 +1,77 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: CI Gate
+    uses: ./.github/workflows/ci.yml
+
+  build-release-artifacts:
+    name: Build OpenFOAM v2412 Release Bundle
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: docker.io/opencfd/openfoam-default:2412@sha256:1ba02114b1c025c370f2e269a07677c16c9bea8d990fcd75ac8378aff9d41b50
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build and package binaries
+        run: |
+          set +e
+          source /usr/lib/openfoam/openfoam2412/etc/bashrc
+          set -e
+          ./Allwmake
+
+          TAG="${GITHUB_REF_NAME}"
+          PKG_DIR="dist/freeBodyFoam-${TAG}-openfoam2412-linux64"
+          mkdir -p "${PKG_DIR}/bin" "${PKG_DIR}/lib"
+
+          for app in freeBodyPimpleFoam freeBody6DoFPimpleFoam freeBodyRhoPimpleFoam freeBodyRhoCentralFoam writeFFDict; do
+            cp -f "${FOAM_USER_APPBIN}/${app}" "${PKG_DIR}/bin/"
+          done
+          for lib in libfallingInletVelocity.so libfreeFallingModels.so libfreeFallingFunctionObjects.so libsixDoFRotatingMotion.so libfreeBodyRotationalMotion.so; do
+            cp -f "${FOAM_USER_LIBBIN}/${lib}" "${PKG_DIR}/lib/"
+          done
+          cp -f LICENSE CITATION.cff "${PKG_DIR}/"
+
+          tar -C dist -czf "dist/freeBodyFoam-${TAG}-openfoam2412-linux64.tar.gz" "freeBodyFoam-${TAG}-openfoam2412-linux64"
+          rm -rf "${PKG_DIR}"
+          cp -f validation/report.pdf "dist/validation-report-${TAG}.pdf"
+          (cd dist && sha256sum * > SHA256SUMS.txt)
+        shell: bash
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-dist
+          path: dist/*
+          if-no-files-found: error
+
+  publish-release:
+    name: Create GitHub Release
+    needs: build-release-artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-dist
+          path: dist
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
+        with:
+          files: dist/*
+          generate_release_notes: true

@@ -1,0 +1,179 @@
+name: CI Verification & Validation
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  metadata-lint:
+    name: Lint, Metadata & Documentation Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+
+      - name: Validate CITATION.cff
+        run: |
+          python3 -c "import yaml; yaml.safe_load(open('CITATION.cff'))"
+
+      - name: Validate .zenodo.json
+        run: |
+          python3 -c "import json; json.load(open('.zenodo.json'))"
+
+      - name: Check Version Consistency
+        run: |
+          v=$(cat VERSION)
+          grep -q "version: $v" CITATION.cff
+          grep -q "\"version\": \"$v\"" .zenodo.json
+          grep -q "\"$v\"" src/solvers/shared/freeBodyFoamVersion.H
+
+      - name: Verify Documentation Links
+        run: |
+          python3 - <<'EOF'
+          import subprocess, re, os
+
+          def github_slug(heading):
+              s = heading.strip().lower()
+              s = re.sub(r'`([^`]+)`', r'\1', s)
+              s = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', s)
+              s = re.sub(r'[^\w\s-]', '', s)
+              return s.replace(' ', '-')
+
+          files = subprocess.check_output(['git', 'ls-files', '*.md']).decode().splitlines()
+          headings = {}
+          for f in files:
+              slugs, counts = set(), {}
+              for line in open(f):
+                  m = re.match(r'^#{1,6}\s+(.*)$', line)
+                  if m:
+                      base = github_slug(m.group(1))
+                      if base in counts:
+                          counts[base] += 1
+                          slugs.add(f'{base}-{counts[base]}')
+                      else:
+                          counts[base] = 0
+                          slugs.add(base)
+              headings[f] = slugs
+
+          broken = []
+          for f in files:
+              content = open(f).read()
+              if 'file:///' in content:
+                  broken.append((f, 'contains file:/// absolute link'))
+              dirname = os.path.dirname(f)
+              links = re.findall(r'\[.*?\]\(([^)\s]+)\)', content)
+              img_links = re.findall(r'!\[.*?\]\(([^)#:\s]+)\)', content)
+              for l in links + img_links:
+                  if l.startswith('http') or l.startswith('mailto:'):
+                      continue
+                  p, anchor = (l.split('#', 1) + [''])[:2]
+                  target = f if not p else os.path.normpath(os.path.join(dirname, p))
+                  if not os.path.exists(target):
+                      broken.append((f, f'broken link: {l} -> {target}'))
+                  elif anchor and target in headings and anchor not in headings[target]:
+                      broken.append((f, f'broken anchor: {l} in {target}'))
+          if broken:
+              for b in broken:
+                  print(b)
+              raise SystemExit(1)
+          print('All tracked markdown links, anchors, and media paths valid!')
+          EOF
+
+  openfoam-tests:
+    name: Run Verification & Validation in OpenFOAM v2412 Container
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: docker.io/opencfd/openfoam-default:2412@sha256:1ba02114b1c025c370f2e269a07677c16c9bea8d990fcd75ac8378aff9d41b50
+      options: --dns 8.8.8.8 --dns 1.1.1.1
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Python dependencies
+        run: |
+          rm -f /etc/apt/sources.list.d/*openfoam*
+          for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+            [ -f "$f" ] && sed -i 's|http://archive.ubuntu.com/ubuntu|http://azure.archive.ubuntu.com/ubuntu|g' "$f"
+          done
+          printf 'Acquire::ForceIPv4 "true";\nAcquire::Retries "3";\nAcquire::http::Timeout "20";\nAcquire::https::Timeout "20";\n' \
+            > /etc/apt/apt.conf.d/99network
+          apt-get update
+          apt-get install -y --no-install-recommends python3-numpy python3-scipy python3-matplotlib python3-pandas python3-pil
+        shell: bash
+
+      - name: Build freeBodyFoam solvers
+        run: |
+          set +e
+          source /usr/lib/openfoam/openfoam2412/etc/bashrc
+          set -e
+          ./Allwmake
+          for app in freeBodyPimpleFoam freeBody6DoFPimpleFoam freeBodyRhoPimpleFoam freeBodyRhoCentralFoam writeFFDict; do
+            test -x "${FOAM_USER_APPBIN}/${app}"
+          done
+          for lib in libfallingInletVelocity.so libfreeFallingModels.so libfreeFallingFunctionObjects.so libsixDoFRotatingMotion.so libfreeBodyRotationalMotion.so; do
+            test -f "${FOAM_USER_LIBBIN}/${lib}"
+          done
+        shell: bash
+
+      - name: Smoke test solver binaries
+        run: |
+          set +e
+          source /usr/lib/openfoam/openfoam2412/etc/bashrc
+          set -e
+          freeBodyPimpleFoam -help
+          freeBody6DoFPimpleFoam -help
+          freeBodyRhoPimpleFoam -help
+          freeBodyRhoCentralFoam -help
+          writeFFDict -help
+        shell: bash
+
+      - name: Run 6DoF Integrator Code Verification
+        run: |
+          python3 validation/code_verification/verify_6dof_integrator.py
+        shell: bash
+
+      - name: Run Rigid-Body Motion Consistency Audit
+        run: |
+          python3 validation/code_verification/check_run_consistency.py
+        shell: bash
+
+      - name: Run Physical Benchmark Validations
+        run: |
+          python3 validation/uhlmann_sphere/analyze_caseA_free.py validation/uhlmann_sphere/caseA_free_G144
+          python3 validation/fernandes2007/analyze_fernandes.py validation/fernandes2007/case_Re100_steady
+          python3 validation/temporal_convergence/compute_temporal_gci.py
+          python3 validation/thinDisk2mm/plot_validation.py
+          python3 validation/thinDisk2mm_tumbling/plot_validation.py
+        shell: bash
+
+      - name: Run theRodDrop Tutorial Case Test
+        run: |
+          set +e
+          source /usr/lib/openfoam/openfoam2412/etc/bashrc
+          . "${WM_PROJECT_DIR}/bin/tools/RunFunctions"
+          set -e
+          cd tutorials/theRodDrop/theRodDrop
+          blockMesh
+          restore0Dir
+          foamDictionary system/controlDict -entry endTime -set 0.002
+          freeBodyPimpleFoam
+          python3 plot_motion.py
+        shell: bash

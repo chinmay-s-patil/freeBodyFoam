@@ -1,0 +1,49 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Chinmay S. Patil
+"""Set up baseline, halved, and quartered time-step cases for temporal convergence testing."""
+
+import os
+import shutil
+
+
+def main():
+    script_dir = os.path.dirname(os.path.realpath(__file__))
+    repo_dir = os.path.abspath(os.path.join(script_dir, "../.."))
+    base_dir = script_dir
+    src_case = os.path.join(repo_dir, "validation/mesh_convergence/mediumMesh/case")
+
+    dt_configs = {
+        "dt_baseline": 2.0e-5,  # baseline dt
+        "dt_halved":   1.0e-5,  # halved dt (r_t = 2.0)
+        "dt_quarter":  5.0e-6,  # quarter dt (r_t = 2.0)
+    }
+
+    for name, dt_val in dt_configs.items():
+        case_path = os.path.join(base_dir, name)
+        if os.path.exists(case_path):
+            shutil.rmtree(case_path)
+        shutil.copytree(src_case, case_path)
+
+        # Clean out postProcessing and old time directories
+        for item in os.listdir(case_path):
+            if item.replace(".", "", 1).isdigit() and item != "0":
+                shutil.rmtree(os.path.join(case_path, item))
+        pp_dir = os.path.join(case_path, "postProcessing")
+        if os.path.exists(pp_dir):
+            shutil.rmtree(pp_dir)
+
+        cd_file = os.path.join(case_path, "system", "controlDict")
+        with open(cd_file, "r") as f:
+            c = f.read()
+        c = c.replace("endTime         0.002;", "endTime         0.001;")
+        c = c.replace("deltaT          2e-5;", f"deltaT          {dt_val:.1e};")
+        c = c.replace("writeInterval   0.002;", "writeInterval   0.001;")
+        with open(cd_file, "w") as f:
+            f.write(c)
+
+        print(f"Prepared temporal case {name} with dt = {dt_val:.1e} s")
+
+
+if __name__ == "__main__":
+    main()

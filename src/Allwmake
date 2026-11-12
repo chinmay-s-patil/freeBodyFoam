@@ -1,0 +1,40 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Chinmay S. Patil
+cd "${0%/*}" || exit 1   # run from this directory
+
+. "${WM_PROJECT_DIR:?}/bin/tools/RunFunctions"
+
+set -e
+
+# Build order:
+#   1. Boundary conditions (BCs/fallingInletVelocity)
+#   2. Shared models library (models -> libfreeFallingModels.so)
+#   3. Function objects (functionObjects/fallingMotion)
+#   4. Motion solvers (motion/sixDoFRotatingMotion, motion/freeBodyRotationalMotion)
+#   5. Dynamic solvers (freeBodyPimpleFoam, freeBody6DoFPimpleFoam, freeBodyRhoPimpleFoam, freeBodyRhoCentralFoam)
+#   6. Utilities (writeFFDict)
+
+echo "--- 1. Boundary conditions ---"
+wmake "$PWD/BCs/fallingInletVelocity"
+
+echo "--- 2. Models (libfreeFallingModels.so) ---"
+wmake "$PWD/models"
+
+echo "--- 3. Function objects ---"
+wmake "$PWD/functionObjects/fallingMotion"
+
+echo "--- 4. Motion solvers ---"
+wmake "$PWD/motion/sixDoFRotatingMotion"
+wmake "$PWD/motion/freeBodyRotationalMotion"
+
+echo "--- 5. Dynamic solvers ---"
+wmake "$PWD/solvers/freeBodyPimpleFoam"
+wmake "$PWD/solvers/freeBody6DoFPimpleFoam"
+wmake "$PWD/solvers/freeBodyRhoPimpleFoam"
+wmake "$PWD/solvers/freeBodyRhoCentralFoam"
+
+echo "--- 6. Utilities ---"
+wmake "$PWD/utilities/writeFFDict"
+
+echo "src build complete."

@@ -1,0 +1,155 @@
+# Benchmark Verification & Physical Validation
+
+Quantitative verification hierarchy, non-inertial reference frame coupling checks, and physical benchmarks for `freeBodyFoam`.
+
+---
+
+## 1. Validation Status & ASME V&V 20 Overview
+
+Incompressible 6DoF code verification checks pass and tumbling Strouhal numbers match experiment, while mean terminal settling velocity for the thin disk shows a 17% deficit against Tinklenberg et al. (2023). Compressible solvers are experimental and unvalidated.
+
+### Verification & Benchmark Summary
+
+| Area | Headline Result | Status |
+| :--- | :--- | :--- |
+| 6DoF rotational integrator | RK4 order $p = 3.991$; invariant drift $< 10^{-14}$ in vacuum | Verified ($\boldsymbol{\omega}$ only) |
+| Non-inertial frame coupling | $F_{\text{aero}}/mg = 99.97\%$ at terminal state | Verified (frame only) |
+| Sliding `cyclicAMI` | Interface flux leak $< 4.8 \times 10^{-13}\text{ m}^3/\text{s}$ | Verified |
+| Numerical uncertainty | 3-mesh GCI; $u_{\text{num}} \le 0.93\%$ ($Re = 100$) | Bounded |
+| Tumbling kinematics | $St = 0.0593$ (exp. $0.055\text{--}0.060$) | Consistent |
+| Terminal settling velocity | $-17\%$ vs. Tinklenberg et al. (2023) | Not validated |
+| Independent drag checks | Broadside disk $< 1\%$ (Roos & Willmarth 1971); sphere evaluated | Disk consistent / sphere offset bounded |
+| Spectral sphere benchmark | Case A ($G = 144, Re = 185$) vs. Uhlmann & Dušek (2014): $-1.0\%$ | Completed |
+| Axisymmetric wakes | $Re = 100$ release; $Re \approx 200$ fixed-body setup only | Partial |
+| Domain sensitivity | Shift $\Delta C_D = -0.019\%$ in $1.5\times$ domain (267k cells) | Bounded |
+| Literature drag audit | Shenoy & Kleinstreuer (2008) audited ($\chi = 10$) | Audited |
+| Compressible solvers | `freeBodyRhoPimpleFoam`, `freeBodyRhoCentralFoam` | Experimental |
+
+---
+
+## 2. Code Verification (Rigid-Body Kinematics & Sliding AMI)
+
+### 2.1 6DoF Rotational ODE Integration
+The 6DoF rotational dynamics in [`freeBody6DoFPimpleFoam`](../src/solvers/freeBody6DoFPimpleFoam/freeBody6DoFPimpleFoam.C) are integrated sequentially in [`correctRotorDynamics.H`](../src/solvers/freeBody6DoFPimpleFoam/correctRotorDynamics.H):
+1. **Angular Velocity ($\boldsymbol{\omega}$)**: Solved using standard explicit 4th-order Runge-Kutta (RK4) on Euler's equations:
+   $$\mathbf{J}_b \frac{d\boldsymbol{\omega}_b}{dt} + \boldsymbol{\omega}_b \times (\mathbf{J}_b \boldsymbol{\omega}_b) = \mathbf{M}_b$$
+   Algorithmic convergence testing on asymmetric precession test functions demonstrates asymptotic convergence order $p = 3.9910$ (matching theoretical RK4).
+2. **Attitude Orientation ($\mathbf{q}$)**: Updated using the exponential map on $SO(3)$ (Rodrigues rotation vector formula) via OpenFOAM quaternion algebra:
+   $$\mathbf{q}^{n+1} = \mathbf{q}^n \otimes \Delta\mathbf{q}(\boldsymbol{\omega}_b^{n+1} \Delta t)$$
+   *Note: Because $\boldsymbol{\omega}$ varies continuously across a time step, the sequential exponential map update is lower order than the 4th-order ODE step for $\boldsymbol{\omega}$; its formal integration order when $\boldsymbol{\omega}$ varies within a step is unverified.*
+3. **Conservation of Invariants in Vacuum**:
+   In unforced zero-torque ballistic motion over $13,333$ steps ($\Delta t = 1.5 \times 10^{-5}\text{ s}$, $T = 0.20\text{ s}$):
+   - Relative angular momentum drift: $|\Delta \|\mathbf{L}\| / \|\mathbf{L}_0\|| < 1.0 \times 10^{-14}$
+   - Relative rotational kinetic energy drift: $|\Delta E / E_0| < 1.0 \times 10^{-14}$
+   - Quaternion norm invariance: $|\|\mathbf{q}\| - 1.0| < 5.0 \times 10^{-15}$
+
+   *Methodological note: RK4 is an explicit, non-symplectic integrator and does not conserve energy or angular momentum exactly. The drift below $10^{-14}$ at $\Delta t = 1.5 \times 10^{-5}\text{ s}$ is a truncation error that scales as $\mathcal{O}(\Delta t^4)$ and happens to be below machine epsilon at this tiny step size. RK4 does not guarantee Hamiltonian preservation over long integration horizons under external forcing.*
+
+---
+
+## 3. Frame Coupling Verification: Planar Cylinder (`theRodDrop`)
+
+The case [`tutorials/theRodDrop/theRodDrop-Denser`](../tutorials/theRodDrop/theRodDrop-Denser) verifies the non-inertial accelerating reference frame implementation under high-momentum hydrodynamic drag.
+
+### 3.1 Case Parameters & Numerical Setup
+* **Geometry**: 2D planar half-cylinder of radius $R = 2.0\text{ m}$ (diameter $D = 4.0\text{ m}$), unit span $w = 1.0\text{ m}$, frontal half-area $A = R \cdot w = 2.0\text{ m}^2$, half-volume $V = 6.283\text{ m}^3$ (modeled with a symmetry plane at $X = 0$).
+* **Body Mass**: Modeled as an effective-mass half-cylinder with $m = 98,018\text{ kg}$ ($\rho_{\mathrm{eff}} \approx 15,600\text{ kg/m}^3$, $\approx 2\times$ steel). Because the solver integrates aerodynamic force only across the modeled half-cylinder wall without symmetry multipliers, balancing this half-body drag against $98,018\text{ kg}$ makes the simulated half-cylinder effectively twice as dense as steel (a physical solid steel body with $\rho_s = 7800\text{ kg/m}^3$ would have $m_{\mathrm{half}} = 49,009\text{ kg}$ and terminal velocity $V_t \approx 68.1\text{ m/s}$).
+* **Scaled Fluid Parameters**: $\rho_f = 300\text{ kg/m}^3$, kinematic viscosity $\nu = 1.5 \times 10^{-5}\text{ m}^2\text{/s}$, planetary gravity $g = 9.81\text{ m/s}^2$ ($F_{\text{grav}} = 961,556.58\text{ N}$).
+* **Turbulence Model**: Reynolds-Averaged Navier-Stokes (RAS) with $k\text{--}\omega$ SST (`simulationType RAS; RASModel kOmegaSST;`).
+* **Reynolds Number**: $Re = \frac{V D}{\nu} = \frac{96.34 \times 4.0}{1.5 \times 10^{-5}} = 2.57 \times 10^7$.
+
+### 3.2 Dynamic Force Balance & Terminal Approach
+The simulation was integrated to $t = 47.48\text{ s}$:
+* Aerodynamic drag: $F_{\text{aero}} = 961,253.14\text{ N}$
+* Planetary weight: $F_{\text{grav}} = 961,556.58\text{ N}$
+* Force balance ratio: $F_{\text{aero}} / F_{\text{grav}} = 99.968\%$ ($0.032\%$ residual imbalance)
+* Frame acceleration: $a_y(t=0) = 9.81\text{ m/s}^2 \to a_y(t=47.48\text{ s}) = 0.003096\text{ m/s}^2$ ($99.968\%$ decay toward equilibrium)
+
+### 3.3 Verification Context & Modeling Notes
+Integrating surface traction on the cylinder yields $C_D = \frac{F_{\text{aero}}}{\frac{1}{2}\rho_f V^2 A} = 0.3452$. Substituting $C_D = 0.3452$ into the terminal velocity formula yields:
+$$V_{t,\text{analytical}} = \sqrt{\frac{2 m g}{\rho_f C_D A}} = \sqrt{\frac{2 \times 961556.58}{300 \times 0.3452 \times 2.0}} = \sqrt{9285.02} = 96.359\text{ m/s} \approx 96.36\text{ m/s}$$
+Compared to simulated velocity $V_{\text{sim}} = 96.340\text{ m/s}$, the relative discrepancy is:
+$$\epsilon_V = \frac{96.340 - 96.359}{96.359} = -0.02\%$$
+
+Three modeling details are important when interpreting this result:
+* Frame coupling vs. drag prediction: Because $C_D = 0.3452$ is extracted from the simulation's own output, recovering $V_{\text{sim}} \approx V_t$ to within $0.02\%$ is a mathematical verification of the accelerating reference frame momentum coupling ($a_{\text{frame}} \to 0$ as $F_{\text{aero}} \to mg$). It does not validate aerodynamic drag coefficients.
+* Buoyancy integration: With `includeBuoyancy true` (the default), total surface pressure $p = p_{\mathrm{rgh}} + \rho_f g h$ is integrated over the cylinder patch, capturing Archimedean buoyancy. In this dense fluid ($\rho_f = 300\text{ kg/m}^3$), buoyancy represents $\approx 3.85\%$ of physical solid steel body weight. The extracted force coefficient $C_D = 0.3452$ is an effective coefficient that incorporates this hydrostatic buoyancy contribution alongside hydrodynamic drag.
+* Half-symmetry mass scaling: The half-cylinder mesh models half the geometry with a symmetry boundary at $X = 0$. The solver balances the integrated half-model force directly against the dictionary mass $m = 98,018\text{ kg}$, which represents an effective-mass half-cylinder ($\rho_{\mathrm{eff}} = 15,600\text{ kg/m}^3$) rather than physical steel.
+
+---
+
+## 4. Physical Benchmark: Thin Disks Falling in Air ([Tinklenberg et al. 2023](https://doi.org/10.1017/jfm.2023.209))
+
+The primary experimental benchmark models a thin circular polyester disk ($D = 2.02\text{ mm}$, nominal $h = 50\ \mu\text{m}$, $\chi = 40.4$, $\rho_d = 1380\text{ kg/m}^3$) falling freely in air ($\rho_{\infty} = 1.204\text{ kg/m}^3$).
+
+### 4.1 Kinematic Consistency
+* **Autorotation Stability**: Spontaneous unidirectional autorotation sustained across 13 completed revolutions ($29,715$ time steps) with planar out-of-plane rate $|\Omega_z| / |\Omega_x| < 0.6\%$.
+* **Tumbling Frequency**: Simulated frequency settles at $f_t = 30.52 \pm 0.17\text{ Hz}$, which is $\approx 16\%$ below the experimental mean ($\approx 36.4\text{ Hz}$).
+* **Strouhal Number**: Evaluated with the Revs 8–13 plateau mean settling speed ($V_{\text{tumble}} \approx 1.040\text{ m/s}$):
+  $$St = \frac{f_t D}{V_{\text{tumble}}} = \frac{30.52 \times 0.00202}{1.040} \approx 0.0593$$
+  (Both match the experimental peak mode $0.055\text{--}0.060$.)
+* **Dynamic Implication**: Strouhal number matches because both fall velocity ($1.02\text{--}1.03\text{ m/s}$) and tumbling frequency ($30.5\text{ Hz}$) are low by approximately $16-17\%$. This indicates dynamic kinematic similarity (frequency scales proportionally with velocity), pointing to an effective force or mass offset rather than a different tumbling mode.
+
+### 4.2 Terminal Settling Velocity Deficit & ASME V&V 20 Assessment
+* **Comparison Error**: $E = V_{\text{sim}} - V_{\text{exp}} = 1.024\text{ m/s} - 1.230\text{ m/s} = -0.206\text{ m/s}$ ($-16.7\%$).
+* **Validation Uncertainty**:
+  - Spatial discretization (3-mesh GCI at steady $Re = 100$, near-body zone refined): $u_{\text{mesh}} = 0.55\% \approx 0.0056\text{ m/s}$ (evaluated at $Re = 100$ and applied to free-fall at $Re \approx 137$)
+  - Temporal discretization (time-step halving $\Delta t = 15\ \mu\text{s} \to 7.5\ \mu\text{s}$): $u_{\Delta t} = 0.04\% \approx 0.0004\text{ m/s}$
+  - Convection scheme sensitivity (LUST vs. linearUpwind): $u_{\text{scheme}} = 0.75\% \approx 0.0077\text{ m/s}$
+  - Combined numerical uncertainty: $u_{\text{num}} = \sqrt{0.55^2 + 0.04^2 + 0.75^2}\% = 0.93\% \approx 0.0095\text{ m/s}$
+  - Input parameter uncertainty (mean disk thickness standard error): $u_{\text{input}} \approx 0.0050\text{ m/s}$ ($0.41\%$)
+  - Experimental measurement uncertainty: $u_{\text{exp}} = \pm 1.2\%$ ($0.0150\text{ m/s}$)
+  - Combined validation uncertainty:
+    $$u_{\text{val}} = \sqrt{u_{\text{num}}^2 + u_{\text{input}}^2 + u_{\text{exp}}^2} = \sqrt{0.0095^2 + 0.0050^2 + 0.0150^2} \approx 0.0185\text{ m/s}\ (1.50\%)$$
+* **Verdict**:
+  $$\frac{|E|}{u_{\text{val}}} = \frac{0.206\text{ m/s}}{0.0185\text{ m/s}} \approx 11.2 \gg 1$$
+  The simulation is **not validated** for mean terminal settling velocity.
+
+### 4.3 Why Specimen Thickness Scatter Does Not Explain the Deficit
+Tinklenberg et al. (2023, Table 1) report $h = 50 \pm 7.5\ \mu\text{m}$ as the specimen-to-specimen standard deviation across the manufactured glitter batch.
+1. **Ensemble Averaging**: Because experimental $V_t = 1.23\text{ m/s}$ is an ensemble mean of thousands of drops, the uncertainty on the mean thickness is the standard error of the mean ($\sigma / \sqrt{N}$), which is small ($< 1\%$). Specimen scatter around the mean shifts the mean velocity by only a fraction of a percent.
+2. **Velocity Scaling**: Since $V_t \propto \sqrt{h}$ at fixed drag coefficient, explaining a $-17\%$ speed deficit solely via thickness would require a $-31\%$ drop in mean thickness ($\approx 34.5\ \mu\text{m}$ instead of $50\ \mu\text{m}$). The paper explicitly verified the $50\ \mu\text{m}$ mean using caliper measurements on stacks.
+3. **Hypothetical Imperfections**: Any hypothetical edge imperfections or non-planar curvature would add drag and reduce physical descent speed, widening the gap (since the simulation is already slower than experiment); this cannot explain why physical disks fall faster.
+
+---
+
+## 5. Technical Roadmap & Action Plan
+
+| # | Validation Task | Objective / Key Finding | Status |
+|---|---|---|---|
+| 1 | Free-fall on `warm_base` vs. `warm_wakeFine` | Direct 6DoF test of static mesh refinement on tumbling limit cycle (shift $-0.09\%$). | Completed |
+| 2 | Temporal and Scheme Suite | `restart_dtHalf` (4 revs, $\Delta t$: $+0.04\%$) and `restart_linUp` (linearUpwind vs. LUST, $-0.75\%$). | Completed |
+| 3 | Domain & Far-Field Sensitivity | Fixed-disk $Re = 140$ in $1.5\times$ domain ($22.5D \times 37.5D$, 267k cells): shift $-0.019\%$. | Completed |
+| 4 | Second Tumbling Realization (3D Perturbation) | 5% $\Omega_z$ perturbation over 8.5 revs: $\bar{\theta}_{\text{out}} = 8.24^\circ$; speed $+0.10\%$, $f_t -1.12\%$. | Completed |
+| 5 | Diagnostic Free-Fall Test (Mass/Weight Scaling) | Weight raised to effective $h \approx 73\ \mu\text{m}$: recovers $V = 1.229\text{ m/s}$ and $f = 35.44\text{ Hz}$. | Completed |
+| 6 | Independent Drag Check | Broadside disk at $Re = 200$: $C_D = 1.106$ ($< 1\%$ vs. Roos & Willmarth 1971); sphere checks at $Re = 100, 200$ ($+27\%$ Cartesian offset). | Completed |
+| 7 | Three-Mesh GCI Study | ASME V&V 20 spatial GCI at $Re = 100$: $R = -0.89$, $u_{\text{mesh}} \le 0.55\%$, $u_{\text{num}} \le 0.93\%$. | Completed |
+| 8 | Primary Literature Audit | Shenoy & Kleinstreuer (2008) ($\chi = 10$, $4\times$ thicker than Tinklenberg $\chi = 40.4$): $C_D \approx 1.15\text{--}1.25$. | Completed |
+| 9 | Spectral Sphere Benchmark (Uhlmann & Dušek 2014) | Heavy rigid sphere ($G = 144$, $\rho_p/\rho_f = 1.5$, `includeBuoyancy true`): $V = -0.900\text{ m/s}$ vs. $-0.909\text{ m/s}$ ($-1.0\%$). | Completed |
+| 10 | Axisymmetric Body Dynamics (Fernandes et al. 2007) | $Re = 100$ release; $Re \approx 200$ fixed-body setup only ($Re_c$ and oscillations untested). | Partial |
+
+---
+
+## 6. Formal Verification Documents & Data Availability
+
+The complete 18-page ASME V&V 20 report is maintained in the `validation/` directory:
+* Reproducibility & Data Manifest: [`validation/README.md`](../validation/README.md)
+* PDF Document: [`validation/report.pdf`](../validation/report.pdf)
+* LaTeX Source: [`validation/report.tex`](../validation/report.tex)
+* Markdown Source: [`validation/report.md`](../validation/report.md)
+* Archival CFD Datasets: Reduced 6DoF kinematic motion telemetry (`motion.dat`, ~30 MB) across all benchmark runs (tumbling disk, Uhlmann Case A sphere, Fernandes disk release) is tracked directly in Git for instant benchmark reproduction. Full 3D OpenFOAM volume fields (6.4 GB transient drop, 25 GB tumbling run, Uhlmann sphere checkpoints, and decomposed `processor*` subdomains) are packaged for Zenodo deposit (packaging manifest in [`validation/README.md`](../validation/README.md)).
+
+---
+
+## 7. References
+
+* Clift, R., Grace, J. R., & Weber, M. E. (1978). *Bubbles, Drops, and Particles*. Academic Press, New York.
+* Fernandes, P. C., Risso, F., Ern, P., & Magnaudet, J. (2007). "Oscillatory motion and wake instability of freely rising axisymmetric bodies". *Journal of Fluid Mechanics*, 573: 479–502.
+* Jenny, M., Dušek, J., & Bouchet, G. (2004). "Instabilities and transition of a sphere freely falling or ascending in a fluid". *Journal of Fluid Mechanics*, 508: 201–239.
+* Roos, F. W., & Willmarth, W. W. (1971). "Some experimental results on sphere and disk drag". *AIAA Journal*, 9(2): 285–291.
+* Schiller, L., & Naumann, A. (1933). "A drag coefficient correlation". *VDI Zeitung*, 77: 318–320.
+* Shenoy, A. R., & Kleinstreuer, C. (2008). "Flow over a thin circular disk at low-to-moderate Reynolds numbers". *Journal of Fluid Mechanics*, 605: 253–262.
+* Tinklenberg, A., Guala, M., & Coletti, F. (2023). "Thin disks falling in air". *Journal of Fluid Mechanics*, 962: A3.
+* Uhlmann, M., & Dušek, J. (2014). "The motion of a single heavy sphere in ambient fluid: A benchmark for interface-resolved particulate flow simulations with significant relative velocities". *International Journal of Multiphase Flow*, 59: 221–243. [DOI: 10.1016/j.ijmultiphaseflow.2013.10.010](https://doi.org/10.1016/j.ijmultiphaseflow.2013.10.010).
+* ASME V&V 20-2009: *Standard for Verification and Validation in Computational Fluid Dynamics and Heat Transfer*. American Society of Mechanical Engineers, New York.
+

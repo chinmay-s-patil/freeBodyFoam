@@ -1,0 +1,16 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Chinmay S. Patil
+cd "${0%/*}" || exit 1   # run from this directory
+
+. "${WM_PROJECT_DIR:?}/bin/tools/RunFunctions"
+
+set -e
+
+echo "Building freeBodyFoam core src..."
+
+if [ -f "$PWD/src/Allwmake" ]; then
+    "$PWD/src/Allwmake"
+fi
+
+echo "Done."

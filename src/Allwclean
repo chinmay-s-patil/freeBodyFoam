@@ -1,0 +1,32 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Chinmay S. Patil
+cd "${0%/*}" || exit 1   # run from this directory
+
+. "${WM_PROJECT_DIR:?}/bin/tools/RunFunctions"
+
+# Clean in reverse build order: utilities, solvers, motion, functionObjects, models, BCs.
+
+echo "--- Cleaning utilities ---"
+wclean "$PWD/utilities/writeFFDict"
+
+echo "--- Cleaning dynamic solvers ---"
+wclean "$PWD/solvers/freeBodyPimpleFoam"
+wclean "$PWD/solvers/freeBody6DoFPimpleFoam"
+wclean "$PWD/solvers/freeBodyRhoPimpleFoam"
+wclean "$PWD/solvers/freeBodyRhoCentralFoam"
+
+echo "--- Cleaning motion solvers ---"
+wclean "$PWD/motion/freeBodyRotationalMotion"
+wclean "$PWD/motion/sixDoFRotatingMotion"
+
+echo "--- Cleaning function objects ---"
+wclean "$PWD/functionObjects/fallingMotion"
+
+echo "--- Cleaning models ---"
+wclean "$PWD/models"
+
+echo "--- Cleaning BCs ---"
+wclean "$PWD/BCs/fallingInletVelocity"
+
+echo "src clean complete."
