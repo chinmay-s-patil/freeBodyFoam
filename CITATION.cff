@@ -8,6 +8,7 @@ authors:
     given-names: Chinmay S.
 version: 0.1.0
 date-released: "2026-11-12"
+doi: "10.5281/zenodo.24148918"
 license: GPL-3.0-or-later
 repository-code: "https://github.com/chinmay-s-patil/freeBodyFoam"
 url: "https://github.com/chinmay-s-patil/freeBodyFoam"

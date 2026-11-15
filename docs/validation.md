@@ -137,7 +137,7 @@ The complete 18-page ASME V&V 20 report is maintained in the `validation/` direc
 * PDF Document: [`validation/report.pdf`](../validation/report.pdf)
 * LaTeX Source: [`validation/report.tex`](../validation/report.tex)
 * Markdown Source: [`validation/report.md`](../validation/report.md)
-* Archival CFD Datasets: Reduced 6DoF kinematic motion telemetry (`motion.dat`, ~30 MB) across all benchmark runs (tumbling disk, Uhlmann Case A sphere, Fernandes disk release) is tracked directly in Git for instant benchmark reproduction. Full 3D OpenFOAM volume fields (6.4 GB transient drop, 25 GB tumbling run, Uhlmann sphere checkpoints, and decomposed `processor*` subdomains) are packaged for Zenodo deposit (packaging manifest in [`validation/README.md`](../validation/README.md)).
+* Archival CFD Datasets: Reduced 6DoF kinematic motion telemetry (`motion.dat`, ~30 MB) across all benchmark runs (tumbling disk, Uhlmann Case A sphere, Fernandes disk release) is tracked directly in Git for instant benchmark reproduction. Full 3D OpenFOAM volume fields (6.4 GB transient drop, 25 GB tumbling run, Uhlmann sphere checkpoints, and decomposed `processor*` subdomains) are deposited on Zenodo ([DOI: 10.5281/zenodo.24260503](https://doi.org/10.5281/zenodo.24260503); software [DOI: 10.5281/zenodo.24148918](https://doi.org/10.5281/zenodo.24148918); packaging manifest in [`validation/README.md`](../validation/README.md)).
 
 ---
 

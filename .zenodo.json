@@ -37,6 +37,11 @@
       "identifier": "10.1016/j.ijmultiphaseflow.2013.10.010",
       "relation": "cites",
       "scheme": "doi"
+    },
+    {
+      "identifier": "10.5281/zenodo.24260503",
+      "relation": "hasPart",
+      "scheme": "doi"
     }
   ]
 }

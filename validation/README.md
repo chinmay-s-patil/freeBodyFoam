@@ -7,13 +7,16 @@ This directory contains the numerical benchmarks, code verification scripts, gri
 ## 1. Reproducibility Policy & Architecture
 
 ### Reproducibility & Tracked Telemetry
+
 Earlier repository snapshots excluded `validation/code_verification/`, `validation/temporal_convergence/`, `validation/thinDisk2mm*/`, and `postProcessing/` output via `.gitignore`, preventing independent reproduction of the verification metrics:
+
 - Explicit RK4 asymptotic order ($p = 3.9910$)
 - Ballistic vacuum invariant conservation (energy drift $< 10^{-14}$)
 - ASME V&V 20 Temporal Discretization Grid Convergence Index ($p = 1.566$, $\mathrm{GCI} = 0.045\%$)
 - The 13-revolution tumbling limit cycle and per-revolution kinematics ($t \in [0, 0.500]\text{ s}$)
 
 Those verification drivers and reduced telemetry datasets are now tracked directly in the repository while keeping large field dumps out of Git:
+
 1. **Bundled in Repository (~30 MB):** All Python verification drivers, plotting scripts, case dictionaries, and 6DoF kinematic telemetry logs (`motion.dat` across 29,715 tumbling steps, the Uhlmann Case A sphere benchmark, and Fernandes disk release) are tracked directly in Git. Verification metrics can be reproduced in seconds without external downloads.
 2. **Zenodo Archival Package (6.4 GB + 25 GB):** The raw 3D OpenFOAM volume fields ($U, p_{\mathrm{rgh}}, \phi$, and decomposed `processor0–7` subdomains) across saved simulation checkpoints are prepared for open-access Zenodo deposit for volumetric reconstruction (see Section 3 for packaging steps).
 
@@ -24,6 +27,7 @@ Those verification drivers and reduced telemetry datasets are now tracked direct
 All verification numbers reported in [`report.md`](./report.md), [`report.pdf`](./report.pdf), and [`docs/validation.md`](../docs/validation.md) can be executed directly:
 
 ### 2.1 RK4 Convergence Order ($p = 3.991$) & Energy Drift ($< 10^{-14}$)
+
 Tests the mathematical implementation of Euler's rigid-body angular velocity equations across systematic time-step refinements and evaluates conservation of invariants over 13,333 steps in vacuum (drift < 1e-14 at this $\Delta t$ ($\mathcal{O}(\Delta t^4)$)):
 
 ```bash
@@ -31,14 +35,15 @@ python3 validation/code_verification/verify_6dof_integrator.py
 ```
 
 **Expected Verified Output:**
+
 ```text
 1A. Asymmetric Rigid-Body Precession — Systematic Time-Step Convergence:
 Time Step dt (s)   Steps    L2 Error (rad/s)       Observed Order p   Theoretical Order 
 -------------------------------------------------------------------------------------
-2.00e-03           25       7.04047110e-03         Baseline           4.0000            
-1.00e-03           50       4.50240103e-04         3.9669             4.0000            
-5.00e-04           100      2.84811476e-05         3.9826             4.0000            
-2.50e-04           200      1.79118283e-06         3.9910             4.0000            
+2.00e-03           25       7.04047110e-03         Baseline           4.0000          
+1.00e-03           50       4.50240103e-04         3.9669             4.0000          
+5.00e-04           100      2.84811476e-05         3.9826             4.0000          
+2.50e-04           200      1.79118283e-06         3.9910             4.0000          
 -------------------------------------------------------------------------------------
 Result: Mathematical formulation achieves asymptotic convergence order p = 3.9910
 
@@ -54,6 +59,7 @@ Result: Mathematical formulation achieves asymptotic convergence order p = 3.991
 ---
 
 ### 2.2 13-Revolution Tumbling Run Kinematics & Energy Balance
+
 Audits C++ rigid-body dynamic coupling, vertical frame acceleration balance, Heun velocity integration, work-energy equivalence, and cycle-by-cycle kinematic evolution over all 13 revolutions ($t = 0 \to 0.500\text{ s}$, 29,715 time steps):
 
 ```bash
@@ -63,6 +69,7 @@ python3 validation/code_verification/check_run_consistency.py \
 ```
 
 **Expected Verified Output:**
+
 ```text
 Rigid-body consistency of logged states
   [PASS] I*dw/dt vs Mx, rel. to max|Mx|: 2.514e-06 (tol 1e-04)
@@ -94,6 +101,7 @@ Exp-relaxation fit: Vinf = 1.0159 m/s, tau = 97 ms, run length = 500 ms
 ---
 
 ### 2.3 Temporal Discretization GCI (ASME V&V 20)
+
 Evaluates temporal grid convergence across three time steps ($dt = 2.0\times 10^{-5}\text{ s}, 1.0\times 10^{-5}\text{ s}, 5.0\times 10^{-6}\text{ s}$ with refinement ratio $r_t = 2.0$) at $t = 0.001000\text{ s}$:
 
 ```bash
@@ -101,6 +109,7 @@ python3 validation/temporal_convergence/compute_temporal_gci.py
 ```
 
 **Expected Verified Output:**
+
 ```text
 Target QOI: Aerodynamic Drag Force Faero_y (nN)
   Coarse dt (Grid 3)  phi3 = 2.611393
@@ -120,16 +129,19 @@ Target QOI: Aerodynamic Drag Force Faero_y (nN)
 ---
 
 ### 2.4 High-Resolution 6-Panel Validation Figure
+
 Regenerates the comparison plots against Tinklenberg et al. (2023) experimental envelopes:
 
 ```bash
 python3 validation/thinDisk2mm_tumbling/plot_tumbling_detailed.py
 ```
+
 Output: `validation/thinDisk2mm_tumbling/tumbling_validation_detailed.png`
 
 ---
 
 ### 2.5 Spectral Sphere Free-Settling Benchmark (Uhlmann & Dušek 2014)
+
 Verifies terminal settling velocity (−1.0 % vs. spectral reference) and initial release acceleration (+0.37 % vs. analytical) against spectral reference data (Jenny et al. 2004, Uhlmann & Dušek 2014) for a heavy rigid sphere ($G = 144$, $Re = 185$):
 
 ```bash
@@ -137,6 +149,7 @@ python3 validation/uhlmann_sphere/analyze_caseA_free.py validation/uhlmann_spher
 ```
 
 **Expected Verified Output:**
+
 ```text
 1. ANALYTIC INITIAL ACCELERATION AT RELEASE:
    Theoretical a0 = g*(rho_r - 1)/(rho_r + 0.5) : -0.250000 m/s^2 (-0.2500 g)
@@ -162,35 +175,24 @@ CASE A BENCHMARK STATUS: PASSED (Settling velocity error <= 2.0%)
 
 For researchers requiring raw volumetric OpenFOAM fields ($U$, $p_{\mathrm{rgh}}$, $\phi$, dynamic mesh point displacements, and decomposed `processor*` directories) to perform 3D flow visualization, vortex identification ($Q$-criterion), or interface flux re-integration, full simulation archives can be packaged and deposited on Zenodo. Reduced motion telemetry (`motion.dat`) is committed to the Git repository for immediate execution without downloading raw fields.
 
-- **Dataset:** Zenodo deposit pending (DOI to be minted on upload)
-- **Suggested Title:** `6DoF CFD Validation Data for Falling Bodies in Fluid (freeBodyFoam)`
-- **DOI Placeholder:** `10.5281/zenodo.<PENDING_DEPOSIT_ID>`
+- **Dataset:** Zenodo Open-Access Deposit
+- **Title:** `6DoF CFD Validation Data for Falling Bodies in Fluid (freeBodyFoam)`
+- **Dataset DOI:** [`10.5281/zenodo.24260503`](https://doi.org/10.5281/zenodo.24260503)
+- **Software DOI:** [`10.5281/zenodo.24148918`](https://doi.org/10.5281/zenodo.24148918)
 - **License:** Creative Commons Attribution 4.0 International (CC-BY 4.0)
 
 ### Archive Manifest
 
-| Archive File | Unpacked Size | Contents |
-| :--- | :---: | :--- |
-| `thinDisk2mm_zeroSpin_transient_6.4GB.tar.gz` | **6.4 GB** | Preserved transient drop run ($t = 0 \to 0.235\text{ s}$). Contains `polyMesh`, all time directories, and `processor0–7`. |
-| `thinDisk2mm_tumbling_13rev_25GB.tar.gz` | **25.2 GB** | Continuous 13-revolution seeded tumbling run ($t = 0 \to 0.500\text{ s}$, 29,715 time steps). Contains complete checkpoint series and logs. |
-| `temporal_convergence_cases.tar.gz` | **293 MB** | Complete meshes and $t = 0.001\text{ s}$ volume states for `dt_baseline`, `dt_halved`, and `dt_quarter`. |
-| `uhlmann_sphere_caseA_G144.tar.gz` | **105 MB** | Dynamic settling case ($t = 0 \to 35\text{ s}$). Contains full logs, reconstructed fields, and `processor0–7`. |
+| Archive File                                    |   Unpacked Size   | Contents                                                                                                                                      |
+| :---------------------------------------------- | :---------------: | :-------------------------------------------------------------------------------------------------------------------------------------------- |
+| `thinDisk2mm_zeroSpin_transient_6.4GB.tar.gz` | **6.4 GB** | Preserved transient drop run ($t = 0 \to 0.235\text{ s}$). Contains `polyMesh`, all time directories, and `processor0–7`.              |
+| `thinDisk2mm_tumbling_13rev_25GB.tar.gz`      | **25.2 GB** | Continuous 13-revolution seeded tumbling run ($t = 0 \to 0.500\text{ s}$, 29,715 time steps). Contains complete checkpoint series and logs. |
+| `temporal_convergence_cases.tar.gz`           | **293 MB** | Complete meshes and $t = 0.001\text{ s}$ volume states for `dt_baseline`, `dt_halved`, and `dt_quarter`.                              |
+| `uhlmann_sphere_caseA_G144.tar.gz`            | **105 MB** | Dynamic settling case ($t = 0 \to 35\text{ s}$). Contains full logs, reconstructed fields, and `processor0–7`.                           |
 
-### Packaging the Dataset for Zenodo Upload
-To create the archive tarballs for uploading to Zenodo:
+### Permanent dataset repository:
 
-```bash
-# 1. Package 6.4 GB transient drop dataset
-tar -czf thinDisk2mm_zeroSpin_transient_6.4GB.tar.gz -C validation/thinDisk2mm case
-
-# 2. Package 25 GB tumbling dataset
-tar -czf thinDisk2mm_tumbling_13rev_25GB.tar.gz -C validation/thinDisk2mm_tumbling case
-
-# 3. Package temporal convergence cases
-tar -czf temporal_convergence_cases.tar.gz -C validation temporal_convergence/dt_baseline temporal_convergence/dt_halved temporal_convergence/dt_quarter
-```
-
-After uploading to Zenodo and reserving/publishing the record, replace `10.5281/zenodo.<PENDING_DEPOSIT_ID>` with your assigned DOI.
+[https://doi.org/10.5281/zenodo.24260503](https://doi.org/10.5281/zenodo.24260503)
 
 ---
 

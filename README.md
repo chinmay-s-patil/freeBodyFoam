@@ -5,6 +5,8 @@
 [![Docker](https://github.com/chinmay-s-patil/freeBodyFoam/actions/workflows/docker.yml/badge.svg)](https://github.com/chinmay-s-patil/freeBodyFoam/actions/workflows/docker.yml)
 [![Docker image](https://img.shields.io/badge/docker%20image-ghcr.io%2Fchinmay--s--patil%2Ffreebodyfoam-0085a0?logo=docker&logoColor=white)](https://github.com/chinmay-s-patil/freeBodyFoam/pkgs/container/freebodyfoam)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-green.svg)](LICENSE)
+[![DOI: 10.5281/zenodo.24148918](https://zenodo.org/badge/DOI/10.5281/zenodo.24148918.svg)](https://doi.org/10.5281/zenodo.24148918)
+[![Dataset DOI: 10.5281/zenodo.24260503](https://img.shields.io/badge/dataset%20DOI-10.5281%2Fzenodo.24260503-blue.svg)](https://doi.org/10.5281/zenodo.24260503)
 [![Verification: Complete (Incompressible 6DoF) | Validation: Partial](https://img.shields.io/badge/verification-incompressible_6DoF_%7C_validation_partial-blue.svg)](docs/validation.md)
 
 `freeBodyFoam` is a custom OpenFOAM solver suite for simulating free-falling bodies, projectile trajectories, atmospheric entry, and 6DoF tumbling dynamics in a body-fixed accelerating reference frame. By solving fluid dynamics in the non-inertial frame of the falling object, trajectory descents across kilometers of physical altitude are resolved within a compact, stationary computational domain.
